@@ -1,0 +1,24 @@
+{
+  "llm": {
+    "api_key": "your-api-key-here",
+    "base_url": "https://api.openai.com/v1",
+    "model": "gpt-4",
+    "temperature": 0.1
+  },
+  "embedding": {
+    "api_key": "your-api-key-here",
+    "base_url": "https://api.openai.com/v1",
+    "model": "text-embedding-3-small"
+  },
+  "rag": {
+    "chroma_db_path": "./chroma_db",
+    "chunk_size": 512,
+    "chunk_overlap": 50,
+    "top_k": 5
+  },
+  "audit": {
+    "languages": ["java", "python", "go", "php"],
+    "max_workers": 4,
+    "enable_parallel": true
+  }
+}
