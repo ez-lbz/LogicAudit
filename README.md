@@ -1,4 +1,4 @@
-# DemoAudit - AI-Powered Code Security Audit Tool
+# LogicAudit - AI-Powered Code Security Audit Tool
 
 A professional code security audit tool powered by LLM and Multi-Agent architecture. Automatically detects traditional vulnerabilities and business logic flaws using LlamaIndex AgentWorkflow.
 
@@ -49,7 +49,7 @@ AgentWorkflow (Serial Execution)
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd demoaudit
+cd logicaudit
 ```
 
 2. Install dependencies:
@@ -117,7 +117,7 @@ Edit `config.json`:
 ## Project Structure
 
 ```
-demoaudit/
+logicaudit/
 ├── agents/                    # FunctionAgent definitions
 │   ├── project_analyzer.py    # Project analysis agent
 │   ├── business_vuln.py       # Business logic vulnerability detection

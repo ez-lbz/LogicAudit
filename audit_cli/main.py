@@ -20,7 +20,7 @@ def main(project_path: str, config: str, reindex: bool, verbose: bool):
     if verbose:
         setup_logger(level=10)
     
-    print_section_header("Code Security Audit Tool")
+    print_section_header("LogicAudit - Code Security Audit Tool")
     
     try:
         print_progress("Loading configuration...")
