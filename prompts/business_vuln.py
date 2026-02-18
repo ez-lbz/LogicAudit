@@ -33,6 +33,7 @@ Detect the following business logic vulnerabilities:
 2. Check if resource ownership is verified against current user
    - Look for code like: if (resource.getUserId() != currentUser.getId())
    - Missing such checks indicates vulnerability
+   - **Constraint**: Verify if the resource is DESIGNED to be shared (e.g., news, public comments, forum posts). If shared, no IDOR.
 
 3. Common high-risk parameter names
    - id, user_id, uid, userId
@@ -55,6 +56,7 @@ Detect the following business logic vulnerabilities:
    - Java: @PreAuthorize("hasRole('ADMIN')")
    - Python: @require_role('admin')
    - Missing annotations = high risk
+   - **Constraint**: Verify if the function is an EXPOSED HTTP ENDPOINT (check `routes` list). Internal helper methods are not vertical privilege escalation.
 ```
 
 ### D9c: Unauthenticated Endpoint Detection
@@ -66,6 +68,8 @@ Detect the following business logic vulnerabilities:
    - Annotations: @RequiresAuthentication, @login_required
    - Interceptor configuration
    - Manual token verification
+   - **Constraint**: Verify if the endpoint is an EXPOSED HTTP ENDPOINT.
+   - **Constraint**: Verify if it is DESIGNED to be public (login, register, public search).
 
 3. Focus on sensitive operations:
    - Data modifications (POST, PUT, DELETE)
@@ -444,5 +448,7 @@ def create_payment():
 - Business logic vulnerabilities are easily overlooked but have significant impact
 - Mass Assignment and field exposure are high-frequency vulnerabilities
 - Null bypass has severe consequences in scenarios like real-name verification
-- All findings must be based on actual code evidence
+- **CRITICAL**: Do NOT report speculative vulnerabilities (e.g., "If input is not validated..."). You **MUST** use tools to verify if validation exists (e.g., check the definition of helper functions or parent classes).
+- If a vulnerability depends on a condition (e.g., configuration, environment), verify that condition. If unable to verify, DO NOT report.
+- Only report vulnerabilities with **confirmable code evidence**.
 """
