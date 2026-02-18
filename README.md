@@ -77,6 +77,9 @@ python -m audit_cli.main -p /path/to/project
 # Reindex project code
 python -m audit_cli.main -p /path/to/project --reindex
 
+# Disable RAG (faster, no indexing)
+python -m audit_cli.main -p /path/to/project --no-rag
+
 # Verbose logging
 python -m audit_cli.main -p /path/to/project -v
 

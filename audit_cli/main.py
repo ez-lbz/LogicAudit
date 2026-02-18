@@ -14,8 +14,9 @@ from llama_index.core import Settings
 @click.option('--project-path', '-p', required=True, help='Project path to audit')
 @click.option('--config', '-c', default='config.json', help='Config file path')
 @click.option('--reindex', is_flag=True, help='Reindex project code')
+@click.option('--no-rag', is_flag=True, help='Disable RAG features')
 @click.option('--verbose', '-v', is_flag=True, help='Verbose logging')
-def main(project_path: str, config: str, reindex: bool, verbose: bool):
+def main(project_path: str, config: str, reindex: bool, no_rag: bool, verbose: bool):
     
     if verbose:
         setup_logger(level=10)
@@ -25,6 +26,8 @@ def main(project_path: str, config: str, reindex: bool, verbose: bool):
     try:
         print_progress("Loading configuration...")
         cfg = load_config(config)
+        if no_rag:
+            cfg.rag.enabled = False
         
         project_path = Path(project_path).absolute()
         if not project_path.exists():
@@ -76,25 +79,16 @@ def main(project_path: str, config: str, reindex: bool, verbose: bool):
         logger.info(f"[+] LLM model: {cfg.llm.model}")
         logger.info(f"[+] Embedding model: {cfg.embedding.model}")
         
-        print_section_header("Step 2: Code Indexing")
-        indexer = CodeIndexer(
-            db_path=cfg.rag.chroma_db_path, 
-            collection_name=f"audit_{project_path.name}"
-        )
-        
-        if reindex:
-            print_progress("Reindexing project code...")
-            indexer.clear_index()
-            total_chunks = indexer.index_project(
-                str(project_path),
-                chunk_size=cfg.rag.chunk_size,
-                chunk_overlap=cfg.rag.chunk_overlap
+        if cfg.rag.enabled:
+            print_section_header("Step 2: Code Indexing")
+            indexer = CodeIndexer(
+                db_path=cfg.rag.chroma_db_path, 
+                collection_name=f"audit_{project_path.name}"
             )
-            logger.info(f"[+] Indexing completed: {total_chunks} chunks")
-        else:
-            stats = indexer.get_stats()
-            if stats['total_chunks'] == 0:
-                print_progress("First run, indexing project code...")
+            
+            if reindex:
+                print_progress("Reindexing project code...")
+                indexer.clear_index()
                 total_chunks = indexer.index_project(
                     str(project_path),
                     chunk_size=cfg.rag.chunk_size,
@@ -102,17 +96,30 @@ def main(project_path: str, config: str, reindex: bool, verbose: bool):
                 )
                 logger.info(f"[+] Indexing completed: {total_chunks} chunks")
             else:
-                logger.info(f"[*] Using existing index: {stats['total_chunks']} chunks")
-        
-        print_progress("Initializing RAG tools...")
-        from tools.rag_tools import initialize_rag_tools
-        initialize_rag_tools(indexer)
+                stats = indexer.get_stats()
+                if stats['total_chunks'] == 0:
+                    print_progress("First run, indexing project code...")
+                    total_chunks = indexer.index_project(
+                        str(project_path),
+                        chunk_size=cfg.rag.chunk_size,
+                        chunk_overlap=cfg.rag.chunk_overlap
+                    )
+                    logger.info(f"[+] Indexing completed: {total_chunks} chunks")
+                else:
+                    logger.info(f"[*] Using existing index: {stats['total_chunks']} chunks")
+            
+            print_progress("Initializing RAG tools...")
+            from tools.rag_tools import initialize_rag_tools
+            initialize_rag_tools(indexer)
+        else:
+            print_section_header("Step 2: Code Indexing (Skipped)")
+            logger.info("[*] RAG disabled by --no-rag flag")
         
         print_section_header("Step 3: Execute Multi-Agent Audit")
         print_progress("Initializing audit workflow...")
         from workflow.audit_workflow import AuditAgentWorkflow
         
-        workflow = AuditAgentWorkflow(llm=Settings.llm)
+        workflow = AuditAgentWorkflow(llm=Settings.llm, enable_rag=cfg.rag.enabled)
         
         print_progress("Starting AgentWorkflow audit...")
         report = workflow.run(project_path=str(project_path))

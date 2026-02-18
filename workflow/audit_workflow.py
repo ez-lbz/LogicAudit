@@ -25,9 +25,18 @@ def _tool_to_openai_spec(tool: FunctionTool) -> dict:
 
 class AuditAgentWorkflow:
 
-    def __init__(self, llm):
+    def __init__(self, llm, enable_rag: bool = True):
         self.llm = llm
-        self.tools = create_audit_tools()
+        self.enable_rag = enable_rag
+        all_tools = create_audit_tools()
+        
+        if not enable_rag:
+            # Filter out RAG tools
+            rag_tools = {'semantic_search', 'query_with_llm', 'get_related_code'}
+            self.tools = [t for t in all_tools if t.metadata.name not in rag_tools]
+        else:
+            self.tools = all_tools
+            
         self.tool_map = {t.metadata.name: t for t in self.tools}
         self.openai_tools = [_tool_to_openai_spec(t) for t in self.tools]
 
@@ -129,6 +138,8 @@ class AuditAgentWorkflow:
         logger.info("\n[1/3] Running ProjectAnalyzer...")
         print_agent_status("ProjectAnalyzer", "Analyzing project structure")
 
+        rag_instr = "6. Search for patterns using RAG (query_with_llm / semantic_search)" if self.enable_rag else ""
+        
         try:
             analysis_text = await self._run_agent_step(
                 system_prompt=PROJECT_ANALYSIS_PROMPT,
@@ -140,7 +151,7 @@ Use available tools to:
 3. Identify tech stack from dependency files (read_file on pom.xml/package.json/requirements.txt)
 4. Extract HTTP routes (extract_routes)
 5. Find security configs (discover_security_config_files)
-6. Search for patterns using RAG (query_with_llm / semantic_search)
+{rag_instr}
 
 Output ONLY valid JSON:
 ```json
@@ -181,7 +192,7 @@ All tool calls MUST use this full absolute path. For example:
 {project_ctx}
 ```
 
-Use tools: read_file, search_by_keyword, semantic_search to examine auth, authorization, and business workflows.
+Use tools: read_file, search_by_keyword{', semantic_search' if self.enable_rag else ''} to examine auth, authorization, and business workflows.
 
 Output ONLY valid JSON with TOP 10 vulnerabilities:
 ```json

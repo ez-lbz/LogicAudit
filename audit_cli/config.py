@@ -20,6 +20,7 @@ class EmbeddingConfig(BaseModel):
 
 
 class RAGConfig(BaseModel):
+    enabled: bool = True
     chroma_db_path: str = "./chroma_db"
     chunk_size: int = 512
     chunk_overlap: int = 50
