@@ -107,19 +107,17 @@ def main(project_path: str, config: str, reindex: bool, no_rag: bool, verbose: b
                     logger.info(f"[+] Indexing completed: {total_chunks} chunks")
                 else:
                     logger.info(f"[*] Using existing index: {stats['total_chunks']} chunks")
-            
-            print_progress("Initializing RAG tools...")
-            from tools.rag_tools import initialize_rag_tools
-            initialize_rag_tools(indexer)
+            print_progress("RAG indexer ready.")
         else:
             print_section_header("Step 2: Code Indexing (Skipped)")
             logger.info("[*] RAG disabled by --no-rag flag")
+            indexer = None
         
         print_section_header("Step 3: Execute Multi-Agent Audit")
         print_progress("Initializing audit workflow...")
         from workflow.audit_workflow import AuditAgentWorkflow
         
-        workflow = AuditAgentWorkflow(llm=Settings.llm, enable_rag=cfg.rag.enabled)
+        workflow = AuditAgentWorkflow(llm=Settings.llm, enable_rag=cfg.rag.enabled, indexer=indexer)
         
         print_progress("Starting AgentWorkflow audit...")
         report = workflow.run(project_path=str(project_path))

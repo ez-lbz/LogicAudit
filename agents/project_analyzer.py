@@ -1,29 +1,51 @@
 from typing import List
 from llama_index.core.agent.workflow import FunctionAgent
-from llama_index.core.tools import FunctionTool
+from llama_index.core.tools import FunctionTool, AsyncBaseTool
 from prompts.project_analysis import PROJECT_ANALYSIS_PROMPT
+from tools.state_tools import save_project_analysis, get_project_path
 
 
-def create_project_analyzer_agent(llm, tools: List[FunctionTool]) -> FunctionAgent:
+def create_project_analyzer_agent(llm, tools: List) -> FunctionAgent:
+    state_tools = [
+        FunctionTool.from_defaults(
+            async_fn=save_project_analysis,
+            name="save_project_analysis",
+            description="Save project analysis results to shared state. Args: analysis (dict) - Analysis JSON object"
+        ),
+        FunctionTool.from_defaults(
+            async_fn=get_project_path,
+            name="get_project_path",
+            description="Get the project path from shared state."
+        ),
+    ]
+
     return FunctionAgent(
         name="ProjectAnalyzer",
         description="Analyze project structure, identify tech stack, extract routes and security configs",
         system_prompt=f"""{PROJECT_ANALYSIS_PROMPT}
 
 ## Your Task
-1. Use tools to explore the project (get_project_files, extract_routes, discover_security_config_files)
-2. Identify tech stack, routes, and security configurations
-3. Output your analysis in JSON format
+1. Call get_project_path to get the project path
+2. EXPLORE THE PROJECT STEP-BY-STEP (Sequential Only):
+   a. Call get_file_tree -> WAIT for result
+   b. Call get_project_files -> WAIT for result
+   c. Call extract_routes -> WAIT for result
+   d. Call discover_security_config_files -> WAIT for result
+   
+   **CRITICAL RULE: ONE TOOL AT A TIME**
+   - Do NOT try to call multiple tools in parallel.
+   - Do NOT combine tool names (e.g. "extract_routesdiscover_...").
+   - Do NOT combine arguments.
+   - Execute strictly sequentially.
 
-## MANDATORY NEXT STEP - YOU MUST DO THIS
-After you output the JSON analysis above, you MUST IMMEDIATELY hand off to BusinessVulnAgent.
+3. Identify tech stack, routes, and security configurations
+4. Call save_project_analysis with your JSON analysis result
+5. Hand off to BusinessVulnAgent
 
-DO NOT END THE CONVERSATION. DO NOT WAIT FOR USER INPUT.
-
-Say exactly: "I will now hand off to BusinessVulnAgent for vulnerability detection."
-Then IMMEDIATELY call the handoff tool to transfer control to BusinessVulnAgent.
+## MANDATORY NEXT STEP
+After calling save_project_analysis, you MUST hand off to BusinessVulnAgent.
 """,
         llm=llm,
-        tools=tools,
+        tools=tools + state_tools,
         can_handoff_to=["BusinessVulnAgent"]
     )

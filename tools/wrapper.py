@@ -1,4 +1,4 @@
-from llama_index.core.tools import FunctionTool
+from llama_index.core.tools import FunctionTool, QueryEngineTool
 from tools.file_ops import read_file, list_directory, get_file_info, get_project_files, get_file_tree
 from tools.code_search import search_by_keyword, search_by_regex, find_files_by_name
 from tools.code_analysis import (
@@ -6,7 +6,6 @@ from tools.code_analysis import (
     discover_security_config_files, analyze_security_config_content,
     get_call_graph
 )
-from tools.rag_tools import semantic_search, get_related_code, search_in_file, query_with_llm
 from utils.report_formatter import print_tool_call, print_tool_result
 import functools
 import os
@@ -70,119 +69,85 @@ def resolve_paths(func):
     return wrapper
 
 
-def create_audit_tools():
-    
+def create_audit_tools(indexer=None, enable_rag: bool = True):
     def wrap(func):
         return log_tool_call(resolve_paths(func))
 
-    read_file_w = wrap(read_file)
-    list_directory_w = wrap(list_directory)
-    get_project_files_w = wrap(get_project_files)
-    get_file_tree_w = wrap(get_file_tree)
-    search_by_keyword_w = wrap(search_by_keyword)
-    search_by_regex_w = wrap(search_by_regex)
-    find_files_by_name_w = wrap(find_files_by_name)
-    find_definition_w = wrap(find_definition)
-    find_references_w = wrap(find_references)
-    extract_routes_w = wrap(extract_routes)
-    discover_security_config_files_w = wrap(discover_security_config_files)
-    analyze_security_config_content_w = wrap(analyze_security_config_content)
-    get_call_graph_w = wrap(get_call_graph)
-    semantic_search_w = log_tool_call(semantic_search)          # no path param
-    get_related_code_w = wrap(get_related_code)
-    search_in_file_w = wrap(search_in_file)
-    query_with_llm_w = log_tool_call(query_with_llm)            # no path param
-    
     tools = [
         FunctionTool.from_defaults(
-            fn=read_file_w,
+            fn=wrap(read_file),
             name="read_file",
             description="Read file content. Args: file_path (str) - file path"
         ),
         FunctionTool.from_defaults(
-            fn=list_directory_w,
+            fn=wrap(list_directory),
             name="list_directory",
             description="List files in directory. Args: directory_path (str), recursive (bool), pattern (str)"
         ),
         FunctionTool.from_defaults(
-            fn=get_project_files_w,
+            fn=wrap(get_project_files),
             name="get_project_files",
             description="Get all code files in project. Args: project_path (str), extensions (list)"
         ),
         FunctionTool.from_defaults(
-            fn=get_file_tree_w,
+            fn=wrap(get_file_tree),
             name="get_file_tree",
             description="Get project directory structure tree. Args: project_path (str), max_depth (int)"
         ),
-        
         FunctionTool.from_defaults(
-            fn=search_by_keyword_w,
+            fn=wrap(search_by_keyword),
             name="search_by_keyword",
             description="Search keyword in project. Args: project_path (str), keyword (str), case_sensitive (bool), file_pattern (str)"
         ),
         FunctionTool.from_defaults(
-            fn=search_by_regex_w,
+            fn=wrap(search_by_regex),
             name="search_by_regex",
             description="Search code using regex. Args: project_path (str), pattern (str), case_insensitive (bool), file_pattern (str)"
         ),
         FunctionTool.from_defaults(
-            fn=find_files_by_name_w,
+            fn=wrap(find_files_by_name),
             name="find_files_by_name",
             description="Find files by name pattern. Args: project_path (str), name_pattern (str), case_insensitive (bool)"
         ),
-        
         FunctionTool.from_defaults(
-            fn=find_definition_w,
+            fn=wrap(find_definition),
             name="find_definition",
             description="Find symbol definition (function/class). Args: project_path (str), symbol_name (str), file_hint (str)"
         ),
         FunctionTool.from_defaults(
-            fn=find_references_w,
+            fn=wrap(find_references),
             name="find_references",
             description="Find all references of symbol. Args: project_path (str), symbol_name (str), limit (int)"
         ),
         FunctionTool.from_defaults(
-            fn=extract_routes_w,
+            fn=wrap(extract_routes),
             name="extract_routes",
             description="Extract HTTP routes/endpoints automatically from all supported frameworks. Args: project_path (str), framework (str). Supports Spring Boot, Flask, FastAPI, Django, Express.js, Laravel"
         ),
-        
         FunctionTool.from_defaults(
-            fn=discover_security_config_files_w,
+            fn=wrap(discover_security_config_files),
             name="discover_security_config_files",
             description="Smart discovery of security config files by directory and file name patterns. Args: project_path (str)"
         ),
         FunctionTool.from_defaults(
-            fn=analyze_security_config_content_w,
+            fn=wrap(analyze_security_config_content),
             name="analyze_security_config_content",
             description="Deep analysis of security config content (CORS, CSRF, Auth). Args: file_path (str), config_content (str)"
         ),
         FunctionTool.from_defaults(
-            fn=get_call_graph_w,
+            fn=wrap(get_call_graph),
             name="get_call_graph",
             description="Get function call graph. Args: project_path (str), function_name (str), max_depth (int)"
         ),
-        
-        FunctionTool.from_defaults(
-            fn=semantic_search_w,
-            name="semantic_search",
-            description="RAG semantic search for code snippets. Args: query (str), top_k (int), file_filter (str)"
-        ),
-        FunctionTool.from_defaults(
-            fn=get_related_code_w,
-            name="get_related_code",
-            description="Get related code context for file. Args: file_path (str), context_size (int)"
-        ),
-        FunctionTool.from_defaults(
-            fn=search_in_file_w,
-            name="search_in_file",
-            description="RAG search in specified file. Args: file_path (str), query (str), top_k (int)"
-        ),
-        FunctionTool.from_defaults(
-            fn=query_with_llm_w,
-            name="query_with_llm",
-            description="Intelligent code query using LLM (with RAG context). Args: query (str), top_k (int)"
-        ),
     ]
-    
+
+    if enable_rag and indexer is not None and indexer.index is not None:
+        query_engine = indexer.get_query_engine(similarity_top_k=5)
+        rag_tool = QueryEngineTool.from_defaults(
+            query_engine=query_engine,
+            name="rag_search",
+            description="Semantic code search using RAG. Use this to find relevant code snippets by meaning. Args: query (str)"
+        )
+        tools.append(rag_tool)
+
     return tools
