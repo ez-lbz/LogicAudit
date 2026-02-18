@@ -41,7 +41,6 @@ class AuditAgentWorkflow:
 
     async def _run_agent_step(self, system_prompt: str, user_prompt: str, use_tools: bool = True, max_iterations: int = 25) -> str:
         """Run a single agent step with manual tool-call loop."""
-        # Enforce forward slashes globally to prevent JSON escape errors (e.g. \b -> backspace)
         system_prompt += "\n\nCRITICAL: ALWAYS use forward slashes `/` for file paths (e.g. `backend/app/main.py`), even heavily on Windows. Python handles forward slashes correctly on all OS. DO NOT use backslashes `\\` to avoid JSON escape sequence errors."
         
         messages = [
@@ -113,13 +112,11 @@ class AuditAgentWorkflow:
         return {}
 
     async def run_async(self, project_path: str, user_msg: str = None) -> Dict[str, Any]:
-        # Normalize path to forward slashes for LLM consistency
         project_path = project_path.replace('\\', '/')
         
         logger.info(f"[*] Starting audit workflow: {project_path}")
         logger.info("=" * 80)
 
-        # Set project root for path resolution
         set_project_root(project_path)
 
         final_state = {
@@ -129,7 +126,6 @@ class AuditAgentWorkflow:
             "final_report": {}
         }
 
-        # ── Step 1: ProjectAnalyzer ──
         logger.info("\n[1/3] Running ProjectAnalyzer...")
         print_agent_status("ProjectAnalyzer", "Analyzing project structure")
 
@@ -167,7 +163,6 @@ Output ONLY valid JSON:
 
         project_ctx = json.dumps(final_state['project_analysis'], indent=2, default=str)
 
-        # ── Step 2: BusinessVulnAgent ──
         logger.info("\n[2/3] Running BusinessVulnAgent...")
         print_agent_status("BusinessVulnAgent", "Scanning for business logic flaws")
 
@@ -216,7 +211,6 @@ Output ONLY valid JSON with TOP 10 vulnerabilities:
             import traceback
             logger.error(traceback.format_exc())
 
-        # ── Step 3: ReportGenerator ──
         logger.info("\n[3/3] Running ReportGenerator...")
         print_agent_status("ReportGenerator", "Generating final report")
 
